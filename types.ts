@@ -2,7 +2,9 @@ export enum VisualizerMode {
   Orbit = 'ORBIT',
   Wave = 'WAVE',
   Grid = 'GRID',
-  Chaos = 'CHAOS'
+  Chaos = 'CHAOS',
+  Ferrofluid = 'FERROFLUID',
+  Surface = 'SURFACE'
 }
 
 export enum GeometryType {

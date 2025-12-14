@@ -29,6 +29,8 @@ export const generateVisualConfig = async (prompt: string): Promise<VisualConfig
       - WAVE: Linear flowing waves, good for chill/ambient.
       - GRID: Structured matrix, good for techno/industrial.
       - CHAOS: Random explosion, good for rock/experimental.
+      - FERROFLUID: Spiky, organic, magnetic liquid sphere. Good for bass-heavy/dubstep/dark.
+      - SURFACE: Continuous liquid mesh, topographic, deforming surface. Good for vocals/smooth/organic tracks.
 
       Geometries:
       - BOX: Solid, digital, harsh. Good for techno/glitch.
@@ -45,7 +47,7 @@ export const generateVisualConfig = async (prompt: string): Promise<VisualConfig
           properties: {
             mode: {
               type: Type.STRING,
-              enum: [VisualizerMode.Orbit, VisualizerMode.Wave, VisualizerMode.Grid, VisualizerMode.Chaos]
+              enum: [VisualizerMode.Orbit, VisualizerMode.Wave, VisualizerMode.Grid, VisualizerMode.Chaos, VisualizerMode.Ferrofluid, VisualizerMode.Surface]
             },
             geometryType: {
               type: Type.STRING,

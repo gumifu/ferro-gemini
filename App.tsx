@@ -2,15 +2,15 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ThreeScene from './components/ThreeScene';
 import { generateVisualConfig } from './services/geminiService';
 import { VisualConfig, VisualizerMode, AudioData, GeometryType } from './types';
-import { Mic, Upload, Play, Pause, Wand2, Music2, Loader2, Volume2, Shapes } from 'lucide-react';
+import { Mic, Upload, Play, Pause, Wand2, Music2, Loader2, Shapes, ChevronLeft, ChevronRight, Activity } from 'lucide-react';
 
 // Default initial state
 const INITIAL_CONFIG: VisualConfig = {
-  mode: VisualizerMode.Orbit,
-  geometryType: GeometryType.Box,
+  mode: VisualizerMode.Ferrofluid, // Start with the new cool mode
+  geometryType: GeometryType.Sphere,
   primaryColor: "#00d4ff",
   secondaryColor: "#ff0055",
-  backgroundColor: "#2a1b3d", // More visible purple/dark indigo, not black
+  backgroundColor: "#2a1b3d", 
   particleSize: 0.6,
   rotationSpeed: 0.5,
   sensitivity: 1.2,
@@ -33,7 +33,7 @@ const App: React.FC = () => {
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | MediaElementAudioSourceNode | null>(null);
   const audioElemRef = useRef<HTMLAudioElement | null>(null);
   
-  // Data ref to share with ThreeJS loop without re-renders
+  // Data ref
   const audioDataRef = useRef<AudioData>({
     frequencyData: new Uint8Array(128),
     overallAmplitude: 0,
@@ -44,26 +44,48 @@ const App: React.FC = () => {
 
   const requestRef = useRef<number>(0);
 
+  // --- Manual Controls ---
+  const cycleMode = (direction: 'left' | 'right') => {
+    const modes = Object.values(VisualizerMode);
+    const currentIndex = modes.indexOf(config.mode);
+    let newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (newIndex < 0) newIndex = modes.length - 1;
+    if (newIndex >= modes.length) newIndex = 0;
+    
+    setConfig(prev => ({ ...prev, mode: modes[newIndex] }));
+  };
+
+  const cycleGeometry = (direction: 'left' | 'right') => {
+    const geometries = Object.values(GeometryType);
+    const currentIndex = geometries.indexOf(config.geometryType);
+    let newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    
+    if (newIndex < 0) newIndex = geometries.length - 1;
+    if (newIndex >= geometries.length) newIndex = 0;
+    
+    setConfig(prev => ({ ...prev, geometryType: geometries[newIndex] }));
+  };
+
+
   // --- Audio Engine Setup ---
   const initAudioContext = () => {
     if (!audioContextRef.current) {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContext();
       analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 512; // Controls resolution of frequency data
+      analyserRef.current.fftSize = 512;
       analyserRef.current.smoothingTimeConstant = 0.8;
     }
     return { ctx: audioContextRef.current, analyser: analyserRef.current };
   };
 
   const cleanupAudio = () => {
-    // Stop and clear current audio element
     if (audioElemRef.current) {
       audioElemRef.current.pause();
       audioElemRef.current.src = "";
       audioElemRef.current.load();
     }
-    // Disconnect current source node
     if (sourceNodeRef.current) {
       sourceNodeRef.current.disconnect();
       sourceNodeRef.current = null;
@@ -73,7 +95,7 @@ const App: React.FC = () => {
 
   const handleMicInput = async () => {
     try {
-      cleanupAudio(); // Ensure clean state
+      cleanupAudio(); 
 
       const { ctx, analyser } = initAudioContext();
       if (!ctx || !analyser) return;
@@ -100,7 +122,7 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    cleanupAudio(); // Completely reset audio state
+    cleanupAudio();
 
     const newAudio = new Audio(URL.createObjectURL(file));
     audioElemRef.current = newAudio;
@@ -108,7 +130,6 @@ const App: React.FC = () => {
     setAudioName(file.name);
     setupFileSource();
 
-    // Reset input so the same file can be selected again if needed
     e.target.value = '';
   };
 
@@ -121,7 +142,6 @@ const App: React.FC = () => {
     if (ctx.state === 'suspended') await ctx.resume();
 
     try {
-      // Always create a new source node for the new audio element
       const source = ctx.createMediaElementSource(audioElemRef.current);
       source.connect(analyser);
       analyser.connect(ctx.destination);
@@ -199,14 +219,10 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // --- Gemini Generation ---
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setIsGenerating(true);
-    
-    // Simulate thinking time if API is fast
     const configResult = await generateVisualConfig(prompt);
-    
     setConfig(configResult);
     setIsGenerating(false);
   };
@@ -232,7 +248,6 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex gap-2">
-             {/* Source Controls */}
              {!sourceType ? (
                 <div className="flex gap-2">
                    <button 
@@ -270,27 +285,39 @@ const App: React.FC = () => {
         {/* Center Prompt Area (Bottom) */}
         <div className="pointer-events-auto w-full max-w-2xl mx-auto mb-8">
            
-           {/* Info Display */}
+           {/* Info Display & Controls */}
            <div className="flex justify-between items-end mb-4 px-2">
               <div className="text-right ml-auto">
-                 <div className="text-[10px] text-gray-200 uppercase tracking-widest mb-1 shadow-black drop-shadow-md font-semibold">Current Config</div>
+                 <div className="text-[10px] text-gray-200 uppercase tracking-widest mb-1 shadow-black drop-shadow-md font-semibold">Config</div>
+                 
                  <div className="flex items-center gap-4 justify-end">
                     
-                    {/* Geometry Badge */}
-                    <div className="flex items-center gap-1.5 opacity-80">
-                        <Shapes className="w-3 h-3 text-gray-300" />
-                        <span className="text-xs font-mono text-gray-300 tracking-wider">{config.geometryType}</span>
+                    {/* Geometry Switcher */}
+                    <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm rounded-lg border border-white/5 p-1 hover:border-white/20 transition-colors">
+                      <button onClick={() => cycleGeometry('left')} className="p-1 hover:text-cyan-400 text-gray-400"><ChevronLeft className="w-3 h-3" /></button>
+                      <div className="flex items-center gap-1.5 opacity-90 px-2 min-w-[100px] justify-center">
+                          <Shapes className="w-3 h-3 text-gray-300" />
+                          <span className="text-xs font-mono text-gray-200 tracking-wider">{config.geometryType}</span>
+                      </div>
+                      <button onClick={() => cycleGeometry('right')} className="p-1 hover:text-cyan-400 text-gray-400"><ChevronRight className="w-3 h-3" /></button>
                     </div>
 
                     <div className="w-[1px] h-3 bg-white/20"></div>
 
-                    {/* Mode Badge */}
-                    <div className="flex items-center gap-2 justify-end">
-                      <div className="w-2 h-2 rounded-full shadow-lg" style={{backgroundColor: config.primaryColor, boxShadow: `0 0 10px ${config.primaryColor}`}}></div>
-                      <span className="text-lg font-bold font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{color: config.primaryColor}}>{config.mode}</span>
+                    {/* Mode Switcher */}
+                    <div className="flex items-center gap-1 bg-black/30 backdrop-blur-sm rounded-lg border border-white/5 p-1 hover:border-white/20 transition-colors">
+                      <button onClick={() => cycleMode('left')} className="p-1 hover:text-cyan-400 text-gray-400"><ChevronLeft className="w-3 h-3" /></button>
+                      <div className="flex items-center gap-2 justify-center px-2 min-w-[120px]">
+                        <Activity className="w-3 h-3" style={{color: config.primaryColor}} />
+                        <span className="text-sm font-bold font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{color: config.primaryColor}}>
+                          {config.mode}
+                        </span>
+                      </div>
+                      <button onClick={() => cycleMode('right')} className="p-1 hover:text-cyan-400 text-gray-400"><ChevronRight className="w-3 h-3" /></button>
                     </div>
                  </div>
-                 <p className="text-xs text-white mt-1 max-w-xs text-right opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{config.description}</p>
+
+                 <p className="text-xs text-white mt-2 max-w-xs text-right opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{config.description}</p>
               </div>
            </div>
 
@@ -306,7 +333,7 @@ const App: React.FC = () => {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-                    placeholder="Describe the vibe... (e.g. 'Sunset over ocean', 'Neon cyberpunk city', 'Morning mist')"
+                    placeholder="Describe the vibe... (e.g. 'Liquid metal bass', 'Soft clouds', 'Geometric tech')"
                     className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-400 px-4 py-3 font-medium outline-none"
                     disabled={isGenerating}
                  />
@@ -329,7 +356,6 @@ const App: React.FC = () => {
 
       </div>
 
-      {/* Intro Overlay if no source selected */}
       {!sourceType && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 bg-black/10 backdrop-blur-[2px]">
            <div className="text-center opacity-60">
