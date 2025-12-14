@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Ferro Visualizer",
+  "description": "An interactive 3D music visualizer where graphics dance to audio, customized by Gemini via text prompts.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
