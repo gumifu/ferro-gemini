@@ -5,8 +5,18 @@ export enum VisualizerMode {
   Chaos = 'CHAOS'
 }
 
+export enum GeometryType {
+  Box = 'BOX',
+  Sphere = 'SPHERE',
+  Tetrahedron = 'TETRAHEDRON',
+  Octahedron = 'OCTAHEDRON',
+  Torus = 'TORUS',
+  Cone = 'CONE'
+}
+
 export interface VisualConfig {
   mode: VisualizerMode;
+  geometryType: GeometryType; // Shape of the particles
   primaryColor: string;
   secondaryColor: string;
   backgroundColor: string;

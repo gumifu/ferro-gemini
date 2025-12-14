@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ThreeScene from './components/ThreeScene';
 import { generateVisualConfig } from './services/geminiService';
-import { VisualConfig, VisualizerMode, AudioData } from './types';
-import { Mic, Upload, Play, Pause, Wand2, Music2, Loader2, Volume2 } from 'lucide-react';
+import { VisualConfig, VisualizerMode, AudioData, GeometryType } from './types';
+import { Mic, Upload, Play, Pause, Wand2, Music2, Loader2, Volume2, Shapes } from 'lucide-react';
 
 // Default initial state
 const INITIAL_CONFIG: VisualConfig = {
   mode: VisualizerMode.Orbit,
+  geometryType: GeometryType.Box,
   primaryColor: "#00d4ff",
   secondaryColor: "#ff0055",
-  backgroundColor: "#1a0b2e", // Deep purple/blue start
+  backgroundColor: "#2a1b3d", // More visible purple/dark indigo, not black
   particleSize: 0.6,
   rotationSpeed: 0.5,
   sensitivity: 1.2,
@@ -55,8 +56,25 @@ const App: React.FC = () => {
     return { ctx: audioContextRef.current, analyser: analyserRef.current };
   };
 
+  const cleanupAudio = () => {
+    // Stop and clear current audio element
+    if (audioElemRef.current) {
+      audioElemRef.current.pause();
+      audioElemRef.current.src = "";
+      audioElemRef.current.load();
+    }
+    // Disconnect current source node
+    if (sourceNodeRef.current) {
+      sourceNodeRef.current.disconnect();
+      sourceNodeRef.current = null;
+    }
+    setIsPlaying(false);
+  };
+
   const handleMicInput = async () => {
     try {
+      cleanupAudio(); // Ensure clean state
+
       const { ctx, analyser } = initAudioContext();
       if (!ctx || !analyser) return;
 
@@ -64,9 +82,6 @@ const App: React.FC = () => {
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       
-      // Cleanup previous
-      if (sourceNodeRef.current) sourceNodeRef.current.disconnect();
-
       const source = ctx.createMediaStreamSource(stream);
       source.connect(analyser);
       
@@ -85,15 +100,16 @@ const App: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (audioElemRef.current) {
-      audioElemRef.current.pause();
-      audioElemRef.current.src = URL.createObjectURL(file);
-    } else {
-      audioElemRef.current = new Audio(URL.createObjectURL(file));
-    }
+    cleanupAudio(); // Completely reset audio state
+
+    const newAudio = new Audio(URL.createObjectURL(file));
+    audioElemRef.current = newAudio;
     
     setAudioName(file.name);
     setupFileSource();
+
+    // Reset input so the same file can be selected again if needed
+    e.target.value = '';
   };
 
   const setupFileSource = async () => {
@@ -104,22 +120,21 @@ const App: React.FC = () => {
 
     if (ctx.state === 'suspended') await ctx.resume();
 
-    if (!sourceNodeRef.current || sourceType !== 'file') {
-       try {
-         const source = ctx.createMediaElementSource(audioElemRef.current);
-         source.connect(analyser);
-         analyser.connect(ctx.destination);
-         sourceNodeRef.current = source;
-       } catch (e) {
-         // Likely already connected
-       }
-    }
-
-    setSourceType('file');
-    audioElemRef.current.play().then(() => {
+    try {
+      // Always create a new source node for the new audio element
+      const source = ctx.createMediaElementSource(audioElemRef.current);
+      source.connect(analyser);
+      analyser.connect(ctx.destination);
+      sourceNodeRef.current = source;
+      
+      setSourceType('file');
+      
+      await audioElemRef.current.play();
       setIsPlaying(true);
       startAnalysisLoop();
-    }).catch(e => console.error(e));
+    } catch (e) {
+      console.error("Error setting up file source:", e);
+    }
 
     audioElemRef.current.onended = () => setIsPlaying(false);
   };
@@ -242,10 +257,8 @@ const App: React.FC = () => {
                     {isPlaying ? <Pause className="w-5 h-5 text-cyan-400" /> : <Play className="w-5 h-5 text-white" />}
                   </button>
                   <button onClick={() => {
+                    cleanupAudio();
                     setSourceType(null);
-                    setIsPlaying(false);
-                    if(audioElemRef.current) audioElemRef.current.pause();
-                    if(sourceNodeRef.current) sourceNodeRef.current.disconnect();
                   }} className="text-xs text-gray-400 hover:text-white underline ml-2">
                     Change Source
                   </button>
@@ -260,10 +273,22 @@ const App: React.FC = () => {
            {/* Info Display */}
            <div className="flex justify-between items-end mb-4 px-2">
               <div className="text-right ml-auto">
-                 <div className="text-[10px] text-gray-200 uppercase tracking-widest mb-1 shadow-black drop-shadow-md font-semibold">Current Mode</div>
-                 <div className="flex items-center gap-2 justify-end">
-                    <div className="w-2 h-2 rounded-full shadow-lg" style={{backgroundColor: config.primaryColor, boxShadow: `0 0 10px ${config.primaryColor}`}}></div>
-                    <span className="text-lg font-bold font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{color: config.primaryColor}}>{config.mode}</span>
+                 <div className="text-[10px] text-gray-200 uppercase tracking-widest mb-1 shadow-black drop-shadow-md font-semibold">Current Config</div>
+                 <div className="flex items-center gap-4 justify-end">
+                    
+                    {/* Geometry Badge */}
+                    <div className="flex items-center gap-1.5 opacity-80">
+                        <Shapes className="w-3 h-3 text-gray-300" />
+                        <span className="text-xs font-mono text-gray-300 tracking-wider">{config.geometryType}</span>
+                    </div>
+
+                    <div className="w-[1px] h-3 bg-white/20"></div>
+
+                    {/* Mode Badge */}
+                    <div className="flex items-center gap-2 justify-end">
+                      <div className="w-2 h-2 rounded-full shadow-lg" style={{backgroundColor: config.primaryColor, boxShadow: `0 0 10px ${config.primaryColor}`}}></div>
+                      <span className="text-lg font-bold font-mono drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]" style={{color: config.primaryColor}}>{config.mode}</span>
+                    </div>
                  </div>
                  <p className="text-xs text-white mt-1 max-w-xs text-right opacity-90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">{config.description}</p>
               </div>
